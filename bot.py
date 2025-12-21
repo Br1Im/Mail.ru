@@ -16,6 +16,8 @@ from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from io import BytesIO
+import urllib.request
+import zipfile
 
 BOT_TOKEN = os.getenv('BOT_TOKEN', '8371292111:AAEeIvjDIFfPvj0eht1ad60OROxPYVfBupg')
 ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID', 'YOUR_CHAT_ID_HERE')
@@ -36,9 +38,68 @@ USERS_FILE = 'users.json'
 os.makedirs(DATA_DIR, exist_ok=True)
 
 
+def download_fonts_if_needed():
+    """Автоматически скачивает шрифты DejaVu если их нет"""
+    fonts_needed = ['DejaVuSans.ttf', 'DejaVuSans-Bold.ttf']
+    
+    # Проверяем, есть ли уже шрифты
+    if all(os.path.exists(font) for font in fonts_needed):
+        logger.info("✓ Шрифты DejaVu уже установлены")
+        return
+    
+    logger.info("Шрифты не найдены, начинаю загрузку...")
+    
+    try:
+        DEJAVU_URL = 'https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.zip'
+        zip_path = 'dejavu_fonts.zip'
+        
+        # Скачиваем
+        logger.info("Скачивание шрифтов DejaVu...")
+        urllib.request.urlretrieve(DEJAVU_URL, zip_path)
+        
+        # Распаковываем
+        logger.info("Распаковка...")
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            for font in fonts_needed:
+                font_path = f'dejavu-fonts-ttf-2.37/ttf/{font}'
+                try:
+                    with zip_ref.open(font_path) as source:
+                        with open(font, 'wb') as target:
+                            target.write(source.read())
+                    logger.info(f"✓ {font} установлен")
+                except KeyError:
+                    logger.warning(f"Шрифт {font} не найден в архиве")
+        
+        # Удаляем архив
+        os.remove(zip_path)
+        logger.info("✅ Шрифты успешно установлены!")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке шрифтов: {e}")
+        logger.warning("Будет использован системный шрифт (возможны проблемы с кириллицей)")
+
+
 def generate_pdf(answers, timestamp):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+    
+    # Регистрируем шрифт с поддержкой кириллицы
+    try:
+        pdfmetrics.registerFont(TTFont('DejaVuSans', 'DejaVuSans.ttf'))
+        pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', 'DejaVuSans-Bold.ttf'))
+        font_name = 'DejaVuSans'
+        font_name_bold = 'DejaVuSans-Bold'
+    except:
+        # Если DejaVu не найден, используем Arial Unicode MS или другой системный шрифт
+        try:
+            pdfmetrics.registerFont(TTFont('Arial', 'arial.ttf'))
+            pdfmetrics.registerFont(TTFont('Arial-Bold', 'arialbd.ttf'))
+            font_name = 'Arial'
+            font_name_bold = 'Arial-Bold'
+        except:
+            # В крайнем случае используем Helvetica (без кириллицы)
+            font_name = 'Helvetica'
+            font_name_bold = 'Helvetica-Bold'
     
     story = []
     styles = getSampleStyleSheet()
@@ -46,6 +107,7 @@ def generate_pdf(answers, timestamp):
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Heading1'],
+        fontName=font_name_bold,
         fontSize=18,
         textColor=colors.HexColor('#f26649'),
         spaceAfter=20,
@@ -55,6 +117,7 @@ def generate_pdf(answers, timestamp):
     heading_style = ParagraphStyle(
         'CustomHeading',
         parent=styles['Heading2'],
+        fontName=font_name_bold,
         fontSize=14,
         textColor=colors.HexColor('#f26649'),
         spaceAfter=10,
@@ -64,6 +127,7 @@ def generate_pdf(answers, timestamp):
     normal_style = ParagraphStyle(
         'CustomNormal',
         parent=styles['Normal'],
+        fontName=font_name,
         fontSize=10,
         textColor=colors.HexColor('#68311f')
     )
@@ -292,6 +356,10 @@ def index():
 if __name__ == '__main__':
     logger.info("=" * 50)
     logger.info("🚀 Запуск бота для приёма заявок")
+    
+    # Скачиваем шрифты если нужно
+    download_fonts_if_needed()
+    
     logger.info(f"📱 Bot Token: {BOT_TOKEN[:10]}..." if BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE' else "📱 Bot Token: ❌ Не настроен")
     logger.info(f"👥 Подписчиков: {len(load_users())}")
     logger.info(f"🌐 Port: {PORT}")
