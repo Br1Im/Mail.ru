@@ -181,10 +181,48 @@ def generate_pdf(answers, timestamp):
 
 
 def load_users():
+    """Загружает список пользователей из users.json, user_*.json и всех заявок"""
+    users = set()
+    
+    # Загружаем из users.json если есть
     if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return []
+        try:
+            with open(USERS_FILE, 'r', encoding='utf-8') as f:
+                users.update(json.load(f))
+        except:
+            pass
+    
+    # Загружаем из файлов user_*.json (основной источник на Render)
+    try:
+        for filename in os.listdir(DATA_DIR):
+            if filename.startswith('user_') and filename.endswith('.json'):
+                filepath = os.path.join(DATA_DIR, filename)
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        if 'chat_id' in data:
+                            users.add(data['chat_id'])
+                except:
+                    pass
+    except:
+        pass
+    
+    # Загружаем chat_id из заявок (дополнительный источник)
+    try:
+        for filename in os.listdir(DATA_DIR):
+            if filename.startswith('application_') and filename.endswith('.json'):
+                filepath = os.path.join(DATA_DIR, filename)
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        if 'subscribers' in data:
+                            users.update(data['subscribers'])
+                except:
+                    pass
+    except:
+        pass
+    
+    return list(users)
 
 
 def save_user(chat_id):
@@ -201,6 +239,11 @@ def save_user(chat_id):
 def send_welcome(message):
     chat_id = message.chat.id
     total_users = save_user(chat_id)
+    
+    # Сохраняем chat_id в отдельный файл для надежности
+    user_file = os.path.join(DATA_DIR, f'user_{chat_id}.json')
+    with open(user_file, 'w', encoding='utf-8') as f:
+        json.dump({'chat_id': chat_id, 'timestamp': int(datetime.now().timestamp() * 1000)}, f)
     
     text = (
         "👋 Добро пожаловать!\n\n"
@@ -234,6 +277,9 @@ def submit_application():
         timestamp = int(datetime.now().timestamp() * 1000)
         filename = f'application_{timestamp}.json'
         filepath = os.path.join(DATA_DIR, filename)
+        
+        # Сохраняем заявку с chat_id всех текущих пользователей
+        anketa_data['subscribers'] = load_users()
         
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(anketa_data, f, ensure_ascii=False, indent=2)
