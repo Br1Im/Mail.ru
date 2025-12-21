@@ -9,7 +9,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import telebot
 
-BOT_TOKEN = os.getenv('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
+BOT_TOKEN = os.getenv('BOT_TOKEN', '8371292111:AAEeIvjDIFfPvj0eht1ad60OROxPYVfBupg')
 ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID', 'YOUR_CHAT_ID_HERE')
 PORT = int(os.getenv('PORT', 5000))
 
@@ -24,25 +24,46 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 DATA_DIR = 'applications'
+USERS_FILE = 'users.json'
 os.makedirs(DATA_DIR, exist_ok=True)
+
+
+def load_users():
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return []
+
+
+def save_user(chat_id):
+    users = load_users()
+    if chat_id not in users:
+        users.append(chat_id)
+        with open(USERS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(users, f)
+        logger.info(f"Добавлен новый пользователь: {chat_id}")
+    return len(users)
 
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
+    total_users = save_user(chat_id)
+    
     text = (
         "👋 Добро пожаловать!\n\n"
         "Это бот для приёма заявок на анализ банкротства.\n\n"
-        f"Ваш Chat ID: `{chat_id}`\n\n"
-        "Используйте этот ID в настройках для получения уведомлений."
+        "Вы будете получать все новые заявки автоматически!\n\n"
+        f"Всего подписчиков: {total_users}"
     )
-    bot.reply_to(message, text, parse_mode='Markdown')
+    bot.reply_to(message, text)
 
 
 @bot.message_handler(commands=['stats'])
 def send_stats(message):
     files = [f for f in os.listdir(DATA_DIR) if f.endswith('.json')]
-    bot.reply_to(message, f"📊 Всего заявок: {len(files)}")
+    users = load_users()
+    bot.reply_to(message, f"📊 Всего заявок: {len(files)}\n👥 Подписчиков: {len(users)}")
 
 
 @app.route('/api/submit', methods=['POST', 'OPTIONS'])
@@ -67,22 +88,37 @@ def submit_application():
         
         logger.info(f"Сохранена заявка: {filename}")
         
+        users = load_users()
+        logger.info(f"Отправка заявки {len(users)} подписчикам")
+        
         try:
             answers = anketa_data['answers']
             message_text = format_message(answers, timestamp)
             
-            bot.send_message(ADMIN_CHAT_ID, message_text, parse_mode='HTML')
+            sent_count = 0
+            failed_count = 0
             
-            with open(filepath, 'rb') as f:
-                full_name = answers['step1_general'].get('fullName', 'Без_имени')
-                bot.send_document(
-                    ADMIN_CHAT_ID,
-                    f,
-                    caption=f"📎 Полные данные заявки",
-                    visible_file_name=f"Заявка_{full_name}_{timestamp}.json"
-                )
+            for user_id in users:
+                try:
+                    bot.send_message(user_id, message_text, parse_mode='HTML')
+                    
+                    with open(filepath, 'rb') as f:
+                        full_name = answers['step1_general'].get('fullName', 'Без_имени')
+                        bot.send_document(
+                            user_id,
+                            f,
+                            caption=f"📎 Полные данные заявки",
+                            visible_file_name=f"Заявка_{full_name}_{timestamp}.json"
+                        )
+                    
+                    sent_count += 1
+                    logger.info(f"Заявка отправлена пользователю {user_id}")
+                    
+                except Exception as e:
+                    failed_count += 1
+                    logger.error(f"Ошибка отправки пользователю {user_id}: {e}")
             
-            logger.info(f"Заявка отправлена в Telegram")
+            logger.info(f"Заявка отправлена: успешно {sent_count}, ошибок {failed_count}")
             
         except Exception as e:
             logger.error(f"Ошибка отправки в Telegram: {e}")
@@ -159,7 +195,7 @@ if __name__ == '__main__':
     logger.info("=" * 50)
     logger.info("🚀 Запуск бота для приёма заявок")
     logger.info(f"📱 Bot Token: {BOT_TOKEN[:10]}..." if BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE' else "📱 Bot Token: ❌ Не настроен")
-    logger.info(f"👤 Admin Chat ID: {ADMIN_CHAT_ID}")
+    logger.info(f"👥 Подписчиков: {len(load_users())}")
     logger.info(f"🌐 Port: {PORT}")
     logger.info(f"💾 Папка для заявок: {DATA_DIR}")
     logger.info("=" * 50)
