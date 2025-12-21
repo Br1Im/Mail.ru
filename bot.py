@@ -4,16 +4,15 @@
 import os
 import json
 import logging
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.application import MIMEApplication
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+import base64
 
+SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY', 'YOUR_SENDGRID_API_KEY')
 MAIL_FROM = os.getenv('MAIL_FROM', 'form.yancodekwork@mail.ru')
-MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', 'xwhKnwnWKUHsNbKB6PLv')
 MAIL_TO = os.getenv('MAIL_TO', 'form.yancodekwork@mail.ru')
 PORT = int(os.getenv('PORT', 5000))
 
@@ -32,22 +31,27 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 def send_email(subject, html_body, json_data, filename):
     try:
-        msg = MIMEMultipart()
-        msg['From'] = MAIL_FROM
-        msg['To'] = MAIL_TO
-        msg['Subject'] = subject
+        message = Mail(
+            from_email=MAIL_FROM,
+            to_emails=MAIL_TO,
+            subject=subject,
+            html_content=html_body
+        )
         
-        msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+        encoded_file = base64.b64encode(json_data.encode()).decode()
         
-        json_attachment = MIMEApplication(json_data, _subtype='json')
-        json_attachment.add_header('Content-Disposition', 'attachment', filename=filename)
-        msg.attach(json_attachment)
+        attached_file = Attachment(
+            FileContent(encoded_file),
+            FileName(filename),
+            FileType('application/json'),
+            Disposition('attachment')
+        )
+        message.attachment = attached_file
         
-        with smtplib.SMTP_SSL('smtp.mail.ru', 465) as server:
-            server.login(MAIL_FROM, MAIL_PASSWORD)
-            server.send_message(msg)
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        response = sg.send(message)
         
-        logger.info(f"Email отправлен на {MAIL_TO}")
+        logger.info(f"Email отправлен на {MAIL_TO} (status: {response.status_code})")
         return True
     except Exception as e:
         logger.error(f"Ошибка отправки email: {e}")
@@ -202,6 +206,7 @@ if __name__ == '__main__':
     logger.info("🚀 Запуск email-сервиса для приёма заявок")
     logger.info(f"📧 Email от: {MAIL_FROM}")
     logger.info(f"📧 Email кому: {MAIL_TO}")
+    logger.info(f"📧 SendGrid API: {'✅ Настроен' if SENDGRID_API_KEY != 'YOUR_SENDGRID_API_KEY' else '❌ Не настроен'}")
     logger.info(f"🌐 Port: {PORT}")
     logger.info(f"💾 Папка для заявок: {DATA_DIR}")
     logger.info("=" * 50)
