@@ -1169,6 +1169,7 @@
             } else {
                 anketaData.answers[step][field] = anketaData.answers[step][field].filter(v => v !== value);
             }
+            updateButtonState();
         }
 
         function clearConditionalFields(step, fields) {
