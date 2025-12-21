@@ -560,6 +560,10 @@
                         <span class="question-hint">Укажите имущество, независимо от того, на кого оно было оформлено.</span>
                         <div class="checkbox-group">
                             <div class="checkbox-option">
+                                <input type="checkbox" id="spouseProp-none" value="Нет имущества" ${anketaData.answers.step2_family.spouseProperty.includes('Нет имущества') ? 'checked' : ''} onchange="updateCheckbox('step2_family', 'spouseProperty', this.value, this.checked)">
+                                <label for="spouseProp-none">Нет имущества</label>
+                            </div>
+                            <div class="checkbox-option">
                                 <input type="checkbox" id="spouseProp-realty" value="Недвижимость" ${anketaData.answers.step2_family.spouseProperty.includes('Недвижимость') ? 'checked' : ''} onchange="updateCheckbox('step2_family', 'spouseProperty', this.value, this.checked)">
                                 <label for="spouseProp-realty">Недвижимость</label>
                             </div>
