@@ -241,26 +241,6 @@
             line-height: 1.8;
         }
         
-        .test-button {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            padding: 15px 25px;
-            border-radius: 50px;
-            font-size: 16px;
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            z-index: 9999;
-        }
-        
-        .test-button:hover {
-            background: #45a049;
-            transform: scale(1.05);
-        }
-        
         @media (max-width: 480px) {
             .container {
                 padding: 20px 15px;
@@ -285,109 +265,12 @@
     </style>
 </head>
 <body>
-    <button class="test-button" onclick="fillTestData()">🚀 Тест</button>
     <div class="container">
         <div id="app"></div>
     </div>
 
     <script>
         const API_URL = 'https://mail-ru-hswz.onrender.com/api/submit';
-        
-        function fillTestData() {
-            anketaData.answers = {
-                step1_general: {
-                    region: "Москва",
-                    fullName: "Тестов Тест Тестович",
-                    wasBankrupt: false,
-                    bankruptYear: null,
-                    bankruptType: null
-                },
-                step2_family: {
-                    isMarried: true,
-                    wasMarriedLast3Years: null,
-                    spouseTransactions: false,
-                    spouseTransactionTypes: [],
-                    spouseProperty: ["Недвижимость"]
-                },
-                step3_children: {
-                    childrenCount: "2",
-                    monthlyExpenses: 30000
-                },
-                step4_debts: {
-                    totalDebt: 1500000,
-                    nonDischargeable: "Нет"
-                },
-                step5_banks: {
-                    selectedBanks: ["Сбербанк", "ВТБ"],
-                    otherBankName: ""
-                },
-                step6_bankCredits: {
-                    "Сбербанк": {
-                        count: 2,
-                        credits: [
-                            { amount: 500000, monthsAgo: 24, paymentsCount: 20 },
-                            { amount: 300000, monthsAgo: 12, paymentsCount: 10 }
-                        ]
-                    },
-                    "ВТБ": {
-                        count: 1,
-                        credits: [
-                            { amount: 700000, monthsAgo: 36, paymentsCount: 30 }
-                        ]
-                    }
-                },
-                step7_mfo: {
-                    mfoCount: 0,
-                    mfoTotalDebt: null
-                },
-                step8_spending: {
-                    purposes: ["Повседневные расходы (питание, одежда, бытовые нужды)", "Расходы на детей"],
-                    otherPurpose: "",
-                    largePurchases: "Нет",
-                    propertyPurchased: "Нет",
-                    propertyType: null,
-                    transfersToThirdParties: "Нет"
-                },
-                step9_income: {
-                    monthlyIncome: 80000,
-                    hasOfficialJob: true,
-                    hasSelfEmployment: false,
-                    hasOtherIncome: false
-                },
-                step10_expensesAndBehavior: {
-                    alimony: 0,
-                    utilities: 5000,
-                    rent: 0,
-                    otherExpenses: 10000,
-                    hasOverdue: true,
-                    maxOverduePeriod: "Более 90 дней",
-                    requestedRestructuring: false,
-                    restructuringWhen: null,
-                    newCreditsAfterTrouble: "Нет",
-                    newCreditsWhen: null
-                },
-                step11_property: {
-                    onlyHome: true,
-                    propertyShares: false,
-                    mortgageContracts: false,
-                    collateralProperty: false,
-                    financialAssets: false,
-                    vehicles: true,
-                    otherProperty: false
-                },
-                step12_legal: {
-                    incapacityDecision: false,
-                    criminalRecord: false
-                }
-            };
-            
-            currentStep = 12;
-            renderCurrentStep();
-            
-            setTimeout(() => {
-                finishAnketa();
-            }, 500);
-        }
         
         const anketaData = {
             meta: {
