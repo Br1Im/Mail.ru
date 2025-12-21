@@ -8,6 +8,14 @@ from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import telebot
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from io import BytesIO
 
 BOT_TOKEN = os.getenv('BOT_TOKEN', '8371292111:AAEeIvjDIFfPvj0eht1ad60OROxPYVfBupg')
 ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID', 'YOUR_CHAT_ID_HERE')
@@ -26,6 +34,86 @@ logger = logging.getLogger(__name__)
 DATA_DIR = 'applications'
 USERS_FILE = 'users.json'
 os.makedirs(DATA_DIR, exist_ok=True)
+
+
+def generate_pdf(answers, timestamp):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+    
+    story = []
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=colors.HexColor('#f26649'),
+        spaceAfter=20,
+        alignment=1
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#f26649'),
+        spaceAfter=10,
+        spaceBefore=15
+    )
+    
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.HexColor('#68311f')
+    )
+    
+    date = datetime.fromtimestamp(timestamp / 1000).strftime('%d.%m.%Y %H:%M')
+    
+    story.append(Paragraph("ЗАЯВКА НА АНАЛИЗ БАНКРОТСТВА", title_style))
+    story.append(Paragraph(f"Дата: {date}", normal_style))
+    story.append(Spacer(1, 20))
+    
+    story.append(Paragraph("1. ОБЩИЕ СВЕДЕНИЯ", heading_style))
+    story.append(Paragraph(f"<b>ФИО:</b> {answers['step1_general'].get('fullName', 'Не указано')}", normal_style))
+    story.append(Paragraph(f"<b>Регион:</b> {answers['step1_general'].get('region', 'Не указан')}", normal_style))
+    story.append(Paragraph(f"<b>Был банкротом:</b> {'Да' if answers['step1_general'].get('wasBankrupt') else 'Нет'}", normal_style))
+    story.append(Spacer(1, 10))
+    
+    story.append(Paragraph("2. СЕМЕЙНОЕ ПОЛОЖЕНИЕ", heading_style))
+    story.append(Paragraph(f"<b>В браке:</b> {'Да' if answers['step2_family'].get('isMarried') else 'Нет'}", normal_style))
+    story.append(Spacer(1, 10))
+    
+    story.append(Paragraph("3. ДЕТИ", heading_style))
+    story.append(Paragraph(f"<b>Количество:</b> {answers['step3_children'].get('childrenCount', 'Не указано')}", normal_style))
+    if answers['step3_children'].get('monthlyExpenses'):
+        story.append(Paragraph(f"<b>Расходы:</b> {answers['step3_children']['monthlyExpenses']:,} ₽/мес", normal_style))
+    story.append(Spacer(1, 10))
+    
+    story.append(Paragraph("4. ДОЛГИ", heading_style))
+    total_debt = answers['step4_debts'].get('totalDebt', 0)
+    story.append(Paragraph(f"<b>Общая сумма:</b> {total_debt:,} ₽", normal_style))
+    story.append(Paragraph(f"<b>Неспис. долги:</b> {answers['step4_debts'].get('nonDischargeable', 'Нет')}", normal_style))
+    story.append(Spacer(1, 10))
+    
+    story.append(Paragraph("5. БАНКИ", heading_style))
+    banks = answers['step5_banks'].get('selectedBanks', [])
+    for bank in banks:
+        story.append(Paragraph(f"• {bank}", normal_style))
+    story.append(Spacer(1, 10))
+    
+    story.append(Paragraph("6. ДОХОДЫ", heading_style))
+    story.append(Paragraph(f"<b>Ежемесячный:</b> {answers['step9_income'].get('monthlyIncome', 0):,} ₽", normal_style))
+    story.append(Paragraph(f"<b>Офиц. работа:</b> {'Да' if answers['step9_income'].get('hasOfficialJob') else 'Нет'}", normal_style))
+    story.append(Spacer(1, 10))
+    
+    story.append(Paragraph("7. РАСХОДЫ", heading_style))
+    expenses = answers['step10_expensesAndBehavior']
+    story.append(Paragraph(f"<b>Просрочки:</b> {'Да' if expenses.get('hasOverdue') else 'Нет'}", normal_style))
+    
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
 
 
 def load_users():
@@ -94,6 +182,9 @@ def submit_application():
         try:
             answers = anketa_data['answers']
             message_text = format_message(answers, timestamp)
+            full_name = answers['step1_general'].get('fullName', 'Без_имени')
+            
+            pdf_buffer = generate_pdf(answers, timestamp)
             
             sent_count = 0
             failed_count = 0
@@ -102,12 +193,19 @@ def submit_application():
                 try:
                     bot.send_message(user_id, message_text, parse_mode='HTML')
                     
+                    pdf_buffer.seek(0)
+                    bot.send_document(
+                        user_id,
+                        pdf_buffer,
+                        caption=f"📎 Заявка в PDF формате",
+                        visible_file_name=f"Заявка_{full_name}_{timestamp}.pdf"
+                    )
+                    
                     with open(filepath, 'rb') as f:
-                        full_name = answers['step1_general'].get('fullName', 'Без_имени')
                         bot.send_document(
                             user_id,
                             f,
-                            caption=f"📎 Полные данные заявки",
+                            caption=f"📎 Данные в JSON формате",
                             visible_file_name=f"Заявка_{full_name}_{timestamp}.json"
                         )
                     
