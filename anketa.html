@@ -265,25 +265,7 @@
             line-height: 1.8;
         }
         
-        .test-button {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            padding: 15px 25px;
-            border-radius: 50px;
-            font-size: 16px;
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            z-index: 9999;
-        }
-        
-        .test-button:hover {
-            background: #45a049;
-            transform: scale(1.05);
-        }
+
         
         @media (max-width: 480px) {
             .container {
@@ -309,7 +291,6 @@
     </style>
 </head>
 <body>
-    <button class="test-button" onclick="fillTestData()">🚀 Тест</button>
     <div class="container">
         <div id="app"></div>
     </div>
@@ -1542,21 +1523,27 @@
             
             const result = getAnketaResult();
             
+            const btnFinish = document.getElementById('btnNext');
+            if (btnFinish) {
+                btnFinish.textContent = 'Отправка...';
+                btnFinish.disabled = true;
+            }
+            
+            // Отправляем запрос с таймаутом 6 секунд
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 6000);
+            
             try {
-                const btnFinish = document.getElementById('btnNext');
-                if (btnFinish) {
-                    btnFinish.textContent = 'Отправка...';
-                    btnFinish.disabled = true;
-                }
-                
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(result)
+                    body: JSON.stringify(result),
+                    signal: controller.signal
                 });
                 
+                clearTimeout(timeoutId);
                 const data = await response.json();
                 
                 if (data.success) {
@@ -1565,9 +1552,15 @@
                     console.error('❌ Ошибка отправки:', data.error);
                 }
             } catch (error) {
-                console.error('❌ Ошибка соединения с сервером:', error);
+                clearTimeout(timeoutId);
+                if (error.name === 'AbortError') {
+                    console.log('⏱️ Запрос отправлен, обработка продолжается на сервере');
+                } else {
+                    console.error('❌ Ошибка соединения с сервером:', error);
+                }
             }
             
+            // Всегда показываем успешное сообщение пользователю
             currentStep = 13;
             renderCurrentStep();
             

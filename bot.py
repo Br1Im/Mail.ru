@@ -19,7 +19,7 @@ from io import BytesIO
 import urllib.request
 import zipfile
 
-BOT_TOKEN = os.getenv('BOT_TOKEN', '8371292111:AAEeIvjDIFfPvj0eht1ad60OROxPYVfBupg')
+BOT_TOKEN = os.getenv('BOT_TOKEN', '7502763053:AAEEDOJLKFDjKVxOq_1yqAgxxq6LWjVjn7s')
 ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID', 'YOUR_CHAT_ID_HERE')
 PORT = int(os.getenv('PORT', 5000))
 
