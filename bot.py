@@ -22,6 +22,7 @@ import zipfile
 BOT_TOKEN = os.getenv('BOT_TOKEN', '7502763053:AAEEDOJLKFDjKVxOq_1yqAgxxq6LWjVjn7s')
 ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID', 'YOUR_CHAT_ID_HERE')
 PORT = int(os.getenv('PORT', 5000))
+WEBHOOK_URL = os.getenv('WEBHOOK_URL', '')  # Для Render: https://your-app.onrender.com
 
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
@@ -399,6 +400,18 @@ def index():
     '''
 
 
+@app.route(f'/{BOT_TOKEN}', methods=['POST'])
+def webhook():
+    """Обработчик webhook для Telegram"""
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return '', 200
+    else:
+        return '', 403
+
+
 if __name__ == '__main__':
     logger.info("=" * 50)
     logger.info("🚀 Запуск бота для приёма заявок")
@@ -410,11 +423,29 @@ if __name__ == '__main__':
     logger.info(f"👥 Подписчиков: {len(load_users())}")
     logger.info(f"🌐 Port: {PORT}")
     logger.info(f"💾 Папка для заявок: {DATA_DIR}")
+    
+    # Определяем режим работы
+    if WEBHOOK_URL:
+        # Webhook режим для продакшена (Render)
+        logger.info(f"🌐 Режим: Webhook")
+        logger.info(f"🔗 Webhook URL: {WEBHOOK_URL}/{BOT_TOKEN}")
+        
+        # Удаляем старый webhook и устанавливаем новый
+        bot.remove_webhook()
+        import time
+        time.sleep(1)
+        bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
+        logger.info("✅ Webhook установлен")
+    else:
+        # Polling режим для локальной разработки
+        logger.info(f"🌐 Режим: Polling (локальная разработка)")
+        bot.remove_webhook()
+        
+        import threading
+        bot_thread = threading.Thread(target=lambda: bot.polling(none_stop=True))
+        bot_thread.daemon = True
+        bot_thread.start()
+        logger.info("✅ Polling запущен")
+    
     logger.info("=" * 50)
-    
-    import threading
-    bot_thread = threading.Thread(target=lambda: bot.polling(none_stop=True))
-    bot_thread.daemon = True
-    bot_thread.start()
-    
     app.run(host='0.0.0.0', port=PORT, debug=False)

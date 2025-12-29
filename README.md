@@ -24,8 +24,11 @@
    - **Start Command**: `python bot.py`
 5. Добавьте переменные окружения:
    - `BOT_TOKEN` = ваш токен от BotFather
-   - `ADMIN_CHAT_ID` = ваш Chat ID
+   - `WEBHOOK_URL` = URL вашего приложения (например: `https://your-app.onrender.com`)
+   - `ADMIN_CHAT_ID` = ваш Chat ID (опционально)
 6. Нажмите **Deploy**
+
+**Важно:** Переменная `WEBHOOK_URL` обязательна для работы на Render! Без неё бот будет использовать polling и выдавать ошибку 409.
 
 ### 4. Обновите anketa.html
 
