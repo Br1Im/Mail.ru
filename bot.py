@@ -410,8 +410,6 @@ def webhook(token):
         return '', 200
     else:
         return '', 403
-    else:
-        return '', 403
 
 
 if __name__ == '__main__':
