@@ -400,14 +400,16 @@ def index():
     '''
 
 
-@app.route(f'/{BOT_TOKEN}', methods=['POST'])
-def webhook():
+@app.route('/<token>', methods=['POST'])
+def webhook(token):
     """Обработчик webhook для Telegram"""
-    if request.headers.get('content-type') == 'application/json':
+    if token == BOT_TOKEN and request.headers.get('content-type') == 'application/json':
         json_string = request.get_data().decode('utf-8')
         update = telebot.types.Update.de_json(json_string)
         bot.process_new_updates([update])
         return '', 200
+    else:
+        return '', 403
     else:
         return '', 403
 
