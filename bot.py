@@ -215,11 +215,29 @@ def send_welcome(message):
     chat_id = message.chat.id
     save_user(chat_id)
     
+    # Получаем список всех подписчиков
+    users = load_users()
+    
     text = (
         "👋 Добро пожаловать!\n\n"
         "Это бот для приёма заявок на анализ банкротства.\n\n"
-        "Вы будете получать все новые заявки автоматически!"
+        "Вы будете получать все новые заявки автоматически!\n\n"
+        "📬 Оповещения получают:\n"
     )
+    
+    # Добавляем информацию о каждом подписчике
+    for user_id in users:
+        try:
+            user_info = bot.get_chat(user_id)
+            name = user_info.first_name
+            if user_info.last_name:
+                name += f" {user_info.last_name}"
+            if user_info.username:
+                name += f" (@{user_info.username})"
+            text += f"  • {name}\n"
+        except:
+            text += f"  • ID: {user_id}\n"
+    
     bot.reply_to(message, text)
 
 
