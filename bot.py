@@ -39,6 +39,35 @@ USERS_FILE = 'users.json'
 os.makedirs(DATA_DIR, exist_ok=True)
 
 
+def load_users():
+    """Загружает список подписчиков из переменной окружения"""
+    users_str = os.getenv('SUBSCRIBERS', '')
+    if users_str:
+        try:
+            return json.loads(users_str)
+        except:
+            pass
+    return []
+
+
+def save_users_to_env(users):
+    """Сохраняет список подписчиков (для локального использования)"""
+    # На Render нужно вручную обновить переменную SUBSCRIBERS через UI
+    logger.info(f"📝 Текущие подписчики: {users}")
+    logger.info(f"💡 Добавьте в Environment на Render: SUBSCRIBERS={json.dumps(users)}")
+
+
+def save_user(chat_id):
+    users = load_users()
+    if chat_id not in users:
+        users.append(chat_id)
+        save_users_to_env(users)
+        logger.info(f"✅ Добавлен новый пользователь: {chat_id}")
+        logger.info(f"⚠️ ВАЖНО: Обновите переменную SUBSCRIBERS на Render!")
+        logger.info(f"   Значение: {json.dumps(users)}")
+    return len(users)
+
+
 def download_fonts_if_needed():
     """Автоматически скачивает шрифты DejaVu если их нет"""
     fonts_needed = ['DejaVuSans.ttf', 'DejaVuSans-Bold.ttf']
@@ -181,76 +210,15 @@ def generate_pdf(answers, timestamp):
     return buffer
 
 
-def load_users():
-    """Загружает список пользователей из users.json, user_*.json и всех заявок"""
-    users = set()
-    
-    # Загружаем из users.json если есть
-    if os.path.exists(USERS_FILE):
-        try:
-            with open(USERS_FILE, 'r', encoding='utf-8') as f:
-                users.update(json.load(f))
-        except:
-            pass
-    
-    # Загружаем из файлов user_*.json (основной источник на Render)
-    try:
-        for filename in os.listdir(DATA_DIR):
-            if filename.startswith('user_') and filename.endswith('.json'):
-                filepath = os.path.join(DATA_DIR, filename)
-                try:
-                    with open(filepath, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        if 'chat_id' in data:
-                            users.add(data['chat_id'])
-                except:
-                    pass
-    except:
-        pass
-    
-    # Загружаем chat_id из заявок (дополнительный источник)
-    try:
-        for filename in os.listdir(DATA_DIR):
-            if filename.startswith('application_') and filename.endswith('.json'):
-                filepath = os.path.join(DATA_DIR, filename)
-                try:
-                    with open(filepath, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        if 'subscribers' in data:
-                            users.update(data['subscribers'])
-                except:
-                    pass
-    except:
-        pass
-    
-    return list(users)
-
-
-def save_user(chat_id):
-    users = load_users()
-    if chat_id not in users:
-        users.append(chat_id)
-        with open(USERS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(users, f)
-        logger.info(f"Добавлен новый пользователь: {chat_id}")
-    return len(users)
-
-
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
-    total_users = save_user(chat_id)
-    
-    # Сохраняем chat_id в отдельный файл для надежности
-    user_file = os.path.join(DATA_DIR, f'user_{chat_id}.json')
-    with open(user_file, 'w', encoding='utf-8') as f:
-        json.dump({'chat_id': chat_id, 'timestamp': int(datetime.now().timestamp() * 1000)}, f)
+    save_user(chat_id)
     
     text = (
         "👋 Добро пожаловать!\n\n"
         "Это бот для приёма заявок на анализ банкротства.\n\n"
-        "Вы будете получать все новые заявки автоматически!\n\n"
-        f"Всего подписчиков: {total_users}"
+        "Вы будете получать все новые заявки автоматически!"
     )
     bot.reply_to(message, text)
 
